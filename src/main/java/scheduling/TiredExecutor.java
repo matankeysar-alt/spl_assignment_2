@@ -3,7 +3,7 @@ package scheduling;
 import java.util.concurrent.PriorityBlockingQueue;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicInteger; 
 
 public class TiredExecutor {
 
@@ -14,7 +14,7 @@ public class TiredExecutor {
     public TiredExecutor(int numThreads) {
         workers = new TiredThread[numThreads];
         for (int i = 0; i < numThreads; i++) {
-            double fatigueFactor = 1.0 + (i * 0.5); // Example fatigue factors
+            double fatigueFactor = 0.5 + Math.random(); // Example: random fatigue factor between 0.5 and 1.5
             TiredThread worker = new TiredThread(i, fatigueFactor);
             workers[i] = worker;
             idleMinHeap.add(worker);

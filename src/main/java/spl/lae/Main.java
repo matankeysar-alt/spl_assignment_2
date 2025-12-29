@@ -18,6 +18,7 @@ public class Main {
         ComputationNode result = lae.run(root);
         if (result != null) {
           OutputWriter.write(result.getMatrix(), args[2]);
+          System.out.println(lae.getWorkerReport());
         }
         else {
           OutputWriter.write("error: Illegal operation: dimensions mismatch", args[2]);

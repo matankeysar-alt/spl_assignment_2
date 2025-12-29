@@ -63,9 +63,13 @@ public class TiredThread extends Thread implements Comparable<TiredThread> {
             throw new IllegalStateException("Worker is busy");
         }
         busy.set(true);
-        // Update idle time
-        long idleDuration = System.nanoTime() - idleStartTime.getAndSet(0);
-        timeIdle.addAndGet(idleDuration);
+
+        long startTime = idleStartTime.getAndSet(0);
+        if (startTime > 0) { 
+            // Update idle time
+            long idleDuration = System.nanoTime() - startTime;
+            timeIdle.addAndGet(idleDuration);
+        }
     }
 
     /**

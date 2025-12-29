@@ -18,18 +18,26 @@ public class LinearAlgebraEngine {
     }
 
     public ComputationNode run(ComputationNode computationRoot) {
-        while (true) {
-            ComputationNode resolvableNode = computationRoot.findResolvable();
-            if (resolvableNode == null) {
-                break;
+        try {
+            while (true) {
+                ComputationNode resolvableNode = computationRoot.findResolvable();
+                if (resolvableNode == null) {
+                    break;
+                }
+                
+                if (resolvableNode.getChildren().size() > 2) {
+                    resolvableNode.associativeNesting();
+                    continue; 
+                }
+                loadAndCompute(resolvableNode);
             }
-            
-            if (resolvableNode.getChildren().size() > 2) {
-                resolvableNode.associativeNesting();
-                continue; 
-            }
-            loadAndCompute(resolvableNode);
         }
+
+        catch (Exception e) {
+            System.err.println("Computation failed: " + e.getMessage());
+            return null;
+        }
+
         return computationRoot;
     }
 
@@ -45,63 +53,56 @@ public class LinearAlgebraEngine {
 
     public void loadAndCompute(ComputationNode node) {
 
-    // 1. LOAD PHASE: Transfer data from Node to Shared Memory
-    List<ComputationNode> operands = node.getChildren();
-    
-    // Safety check: ensure we actually have operands
-    if (operands == null || operands.isEmpty()) {
-        throw new IllegalArgumentException("Node must have operands to compute.");
-    }
-
-    // Load M1 (Left Matrix)
-    leftMatrix.loadRowMajor(operands.get(0).getMatrix());
-    
-    // Load M2 (Right Matrix) - Only for binary operators
-    if (operands.size() > 1) {
-        if (node.getNodeType() == ComputationNodeType.MULTIPLY) {
-            rightMatrix.loadColumnMajor(operands.get(1).getMatrix());
-        } else {
-            rightMatrix.loadRowMajor(operands.get(1).getMatrix());
+        List<ComputationNode> operands = node.getChildren();
+        
+        if (operands == null || operands.isEmpty()) {
+            throw new IllegalArgumentException("Node must have operands to compute.");
         }
+
+        leftMatrix.loadRowMajor(operands.get(0).getMatrix());
+        
+        if (operands.size() > 1) {
+            if (node.getNodeType() == ComputationNodeType.MULTIPLY) {
+                rightMatrix.loadColumnMajor(operands.get(1).getMatrix());
+            } else {
+                rightMatrix.loadRowMajor(operands.get(1).getMatrix());
+            }
+        }
+
+        List<Runnable> tasks = null;
+
+        switch (node.getNodeType()) {
+            case ADD:
+                tasks = createAddTasks(); 
+                break;
+            case MULTIPLY:
+                tasks = createMultiplyTasks();
+                break;
+            case NEGATE:
+                tasks = createNegateTasks();
+                break;
+            case TRANSPOSE:
+                tasks = createTransposeTasks();
+                break;
+            default:
+                throw new IllegalArgumentException("Unsupported operation: " + node.getNodeType());
+        }
+
+        if (tasks != null && !tasks.isEmpty()) {
+            executor.submitAll(tasks);
+        }
+        
+        
+        double[][] resultData = leftMatrix.readRowMajor();
+
+        if (node.getNodeType() == ComputationNodeType.TRANSPOSE) {
+            resultData = physicalTranspose(resultData);
+        }
+
+        node.resolve(resultData);
     }
 
-    // 2. COMPUTE PHASE: Create tasks
-    List<Runnable> tasks = null;
-
-    switch (node.getNodeType()) {
-        case ADD:
-            tasks = createAddTasks(); // Assign to main 'tasks' variable
-            break;
-        case MULTIPLY:
-            tasks = createMultiplyTasks();
-            break;
-        case NEGATE:
-            tasks = createNegateTasks();
-            break;
-        case TRANSPOSE:
-            tasks = createTransposeTasks();
-            break;
-        default:
-            throw new IllegalArgumentException("Unsupported operation: " + node.getNodeType());
-    }
-
-    // 3. EXECUTE: Submit and Wait
-    if (tasks != null && !tasks.isEmpty()) {
-        executor.submitAll(tasks);
-    }
-    
-    // 4. UNLOAD: Store the result (M1) back into the computation node
-    // This correctly updates the node from an OPERATION to a MATRIX type
-    double[][] resultData = leftMatrix.readRowMajor();
-
-    if (node.getNodeType() == ComputationNodeType.TRANSPOSE) {
-        resultData = physicalTranspose(resultData);
-    }
-
-    node.resolve(resultData);
-}
-
-    public List<Runnable> createAddTasks() {
+    public List<Runnable> createAddTasks() { // if the matrices are not the same size, an exception will be thrown during execution
         List<Runnable> tasks = new ArrayList<>();
         int rowCount = leftMatrix.length();
 
@@ -164,15 +165,19 @@ public class LinearAlgebraEngine {
     }
 
     private double[][] physicalTranspose(double[][] matrix) {
-    int rows = matrix.length;
-    int cols = matrix[0].length;
-    double[][] transposed = new double[cols][rows]; // Swap dimensions
-
-    for (int i = 0; i < rows; i++) {
-        for (int j = 0; j < cols; j++) {
-            transposed[j][i] = matrix[i][j]; // Swap indices
+        if (matrix == null || matrix.length == 0) { // Handle empty matrix
+            return matrix;
         }
-    }
-    return transposed;
+
+        int rows = matrix.length;
+        int cols = matrix[0].length;
+        double[][] transposed = new double[cols][rows]; // Swap dimensions
+
+        for (int i = 0; i < rows; i++) {
+            for (int j = 0; j < cols; j++) {
+                transposed[j][i] = matrix[i][j]; // Swap indices
+            }
+        }
+        return transposed;
     }
 }

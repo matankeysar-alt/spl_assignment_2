@@ -75,57 +75,65 @@ public class SharedVector {
         }
     }
 
+    // Helper method to calculate dot product (assumes read locks are held)
+    private double calculateDotProduct(SharedVector other) {
+
+        if (this.length() != other.length()) {
+        throw new IllegalArgumentException("Dot product error: vectors must have same length (" 
+            + this.length() + " != " + other.length() + ")");
+        }
+
+        double result = 0;
+        for (int i = 0; i < vector.length; i++) {
+            result += vector[i] * other.get(i);
+        }
+
+        return result;
+    }
+
     public double dot(SharedVector other) {
-        lock.readLock().lock();
+        this.lock.readLock().lock();
+        other.lock.readLock().lock();
         try {
-            double result = 0;
-            for (int i = 0; i < vector.length; i++) {
-                result += vector[i] * other.get(i);
-            }
-            return result;
+            return calculateDotProduct(other); 
         } 
         finally {
-            lock.readLock().unlock();
+            //release locks in reverse order
+            other.lock.readLock().unlock();
+            this.lock.readLock().unlock();
         }
     }
 
     public void vecMatMul(SharedMatrix matrix) {
     lock.writeLock().lock();
     try {
-        // --- VALIDATION START ---
         if (this.orientation != VectorOrientation.ROW_MAJOR) {
             throw new IllegalStateException("Vector must be row-major for vecMatMul");
         }
-        // CRITICAL: We require the matrix to be Column Major so we can retrieve columns easily
+    
         if (matrix.getOrientation() != VectorOrientation.COLUMN_MAJOR) {
             throw new IllegalArgumentException("Matrix must be column-major for vecMatMul");
         }
-        // --- VALIDATION END ---
 
-
-        // CHANGE 1: Determine the size of the RESULT vector. 
-        // A (1x3) vector * (3x2) matrix = (1x2) vector.
-        // matrix.length() returns the number of columns (2).
         int resultWidth = matrix.length(); 
         double[] result = new double[resultWidth];
 
-        // CHANGE 2: Iterate over every column of the matrix
         for (int j = 0; j < resultWidth; j++) {
             SharedVector column = matrix.get(j);
             
-            // CHANGE 3: The Fix. 
-            // We check if the Row Length (3) matches the Column Height (3).
             if (this.length() != column.length()) {
                 throw new IllegalArgumentException("Vector length (" + this.length() + 
                                                  ") must match matrix column height (" + column.length() + ")");
             }
 
-            // CHANGE 4: Math.
-            // Calculate the dot product: Row * Column[j]
-            result[j] = this.dot(column);
+            column.readLock(); // write lock already held on this vector 
+            try {
+                result[j] = calculateDotProduct(column);
+            } finally {
+                column.readUnlock();
+            }
         }
 
-        // Apply the result
         this.vector = result;
 
         } 

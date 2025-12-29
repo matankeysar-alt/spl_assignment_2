@@ -59,6 +59,11 @@ public class SharedMatrix {
     }
 
     public VectorOrientation getOrientation() {
+
+        if (vectors == null || vectors.length == 0) {
+        return VectorOrientation.ROW_MAJOR; // Default orientation
+        }
+
         return vectors[0].getOrientation();
     }
 
