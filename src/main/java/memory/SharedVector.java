@@ -52,6 +52,11 @@ public class SharedVector {
     public void add(SharedVector other) {
         lock.writeLock().lock();
         try {
+
+            if (this.length() != other.length()) {
+                throw new IllegalArgumentException("Vector length mismatch: " + this.length() + " != " + other.length());
+            }
+
             for (int i = 0; i < vector.length; i++) {
                 vector[i] += other.get(i);
             }
@@ -107,6 +112,7 @@ public class SharedVector {
     public void vecMatMul(SharedMatrix matrix) {
     lock.writeLock().lock();
     try {
+
         if (this.orientation != VectorOrientation.ROW_MAJOR) {
             throw new IllegalStateException("Vector must be row-major for vecMatMul");
         }
@@ -115,16 +121,21 @@ public class SharedVector {
             throw new IllegalArgumentException("Matrix must be column-major for vecMatMul");
         }
 
-        int resultWidth = matrix.length(); 
-        double[] result = new double[resultWidth];
+        int matrixWidth = matrix.length(); 
+        if (matrixWidth == 0) {
+            throw new IllegalArgumentException("Operation failed: Matrix cannot be empty for vecMatMul");
+        }
 
-        for (int j = 0; j < resultWidth; j++) {
+        int matrixHeight = matrix.get(0).length(); 
+        if (this.length() != matrixHeight) {
+            throw new IllegalArgumentException("Vector length (" + this.length() + 
+                                               ") must match matrix height (" + matrixHeight + ")");
+        }
+
+        double[] result = new double[matrixWidth];
+
+        for (int j = 0; j < matrixWidth; j++) {
             SharedVector column = matrix.get(j);
-            
-            if (this.length() != column.length()) {
-                throw new IllegalArgumentException("Vector length (" + this.length() + 
-                                                 ") must match matrix column height (" + column.length() + ")");
-            }
 
             column.readLock(); // write lock already held on this vector 
             try {

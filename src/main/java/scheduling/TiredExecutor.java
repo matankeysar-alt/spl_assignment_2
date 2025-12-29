@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger; 
 
+
 public class TiredExecutor {
 
     private final TiredThread[] workers;
@@ -85,4 +86,20 @@ public class TiredExecutor {
         }
         return report;
     }
+
+    public double getFairness() {
+        double totalFatigue = 0.0;
+        for (TiredThread worker : workers) {
+            totalFatigue += worker.getFatigue();
+        }
+        double averageFatigue = totalFatigue / workers.length;
+
+        double fairness = 0.0;
+        for (TiredThread worker : workers) {
+            fairness += Math.pow(worker.getFatigue() - averageFatigue, 2);
+        }
+
+        return fairness;
+    }
+
 }

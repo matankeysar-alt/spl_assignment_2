@@ -31,6 +31,7 @@ public class Main {
         OutputWriter.write("error: Illegal operation: dimensions mismatch", args[2]);
       }
       finally {
+        System.out.println("the fairness is: " + lae.getFairness());
         lae.shutdown();
       } 
     }
