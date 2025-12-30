@@ -32,7 +32,6 @@ public class Main {
       }
       finally {
         System.out.println("the fairness is: " + lae.getFairness());
-        lae.shutdown();
       } 
     }
 }

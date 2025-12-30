@@ -92,6 +92,7 @@ public class TiredExecutor {
         for (TiredThread worker : workers) {
             totalFatigue += worker.getFatigue();
         }
+        
         double averageFatigue = totalFatigue / workers.length;
 
         double fairness = 0.0;

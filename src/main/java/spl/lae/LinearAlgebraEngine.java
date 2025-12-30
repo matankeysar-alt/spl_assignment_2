@@ -18,36 +18,42 @@ public class LinearAlgebraEngine {
     }
 
     public ComputationNode run(ComputationNode computationRoot) {
-    try {
-        while (true) {
-            ComputationNode resolvableNode = computationRoot.findResolvable();
-            
-            if (resolvableNode == null) {
+        try {
+            while (true) {
+                ComputationNode resolvableNode = computationRoot.findResolvable();
                 
-                
-                if (computationRoot.getMatrix() != null) { 
-                    break; 
+                if (resolvableNode == null) {
+                    
+                    
+                    if (computationRoot.getMatrix() != null) { 
+                        break; 
+                    }
+
+                    
+                    Thread.yield();
+                    continue; 
                 }
-
                 
-                Thread.yield();
-                continue; 
+                if (resolvableNode.getChildren().size() > 2) {
+                    resolvableNode.associativeNesting();
+                    continue; 
+                }
+                
+                loadAndCompute(resolvableNode);
             }
-            
-            if (resolvableNode.getChildren().size() > 2) {
-                resolvableNode.associativeNesting();
-                continue; 
-            }
-            
-            loadAndCompute(resolvableNode);
+        } 
+        
+        catch (Exception e) {
+            System.err.println("Computation failed: " + e.getMessage());
+            return null;
         }
-    } catch (Exception e) {
-        System.err.println("Computation failed: " + e.getMessage());
-        return null;
-    }
 
-    return computationRoot;
-}
+        finally {
+            shutdown();
+        }
+
+        return computationRoot;
+    }
 
 
     public void shutdown() {
@@ -62,13 +68,43 @@ public class LinearAlgebraEngine {
     public void loadAndCompute(ComputationNode node) {
 
         List<ComputationNode> operands = node.getChildren();
-        
+
         if (operands == null || operands.isEmpty()) {
             throw new IllegalArgumentException("Node must have operands to compute.");
         }
 
+        // --- תוספת: בדיקת מימדים לפני טעינה ---
+        // אנו בודקים את המימדים על המטריצות המקוריות (operands)
+        // כדי להימנע מבעיות עם ה-Buffer הפנימי של leftMatrix/rightMatrix
+        if (operands.size() > 1) {
+            double[][] m1 = operands.get(0).getMatrix();
+            double[][] m2 = operands.get(1).getMatrix();
+
+            int rows1 = m1.length;
+            int cols1 = m1[0].length;
+            int rows2 = m2.length;
+            int cols2 = m2[0].length;
+
+            // בדיקה לחיבור (ADD) - חובה שוויון מלא
+            if (node.getNodeType() == ComputationNodeType.ADD) {
+                if (rows1 != rows2 || cols1 != cols2) {
+                    throw new IllegalArgumentException("Matrix dimension mismatch: " +
+                            rows1 + "x" + cols1 + " != " + rows2 + "x" + cols2);
+                }
+            }
+
+            // בדיקה לכפל (MULTIPLY) - עמודות הראשונה מול שורות השנייה
+            if (node.getNodeType() == ComputationNodeType.MULTIPLY) {
+                if (cols1 != rows2) {
+                    throw new IllegalArgumentException("Matrix dimension mismatch: Cols " +
+                            cols1 + " != Rows " + rows2);
+                }
+            }
+        }
+        // ----------------------------------------
+
         leftMatrix.loadRowMajor(operands.get(0).getMatrix());
-        
+
         if (operands.size() > 1) {
             if (node.getNodeType() == ComputationNodeType.MULTIPLY) {
                 rightMatrix.loadColumnMajor(operands.get(1).getMatrix());
@@ -81,7 +117,7 @@ public class LinearAlgebraEngine {
 
         switch (node.getNodeType()) {
             case ADD:
-                tasks = createAddTasks(); 
+                tasks = createAddTasks();
                 break;
             case MULTIPLY:
                 tasks = createMultiplyTasks();
@@ -99,8 +135,8 @@ public class LinearAlgebraEngine {
         if (tasks != null && !tasks.isEmpty()) {
             executor.submitAll(tasks);
         }
-        
-        
+
+
         double[][] resultData = leftMatrix.readRowMajor();
 
         if (node.getNodeType() == ComputationNodeType.TRANSPOSE) {
@@ -110,10 +146,17 @@ public class LinearAlgebraEngine {
         node.resolve(resultData);
     }
 
-    public List<Runnable> createAddTasks() { // if the matrices are not the same size, an exception will be thrown during execution
+    public List<Runnable> createAddTasks() { 
         if (leftMatrix.length() != rightMatrix.length()) {
             throw new IllegalArgumentException("Matrix dimension mismatch: Rows count " + 
                                             leftMatrix.length() + " != " + rightMatrix.length());
+        }
+
+        int leftWidth = leftMatrix.readRowMajor()[0].length;
+        int rightWidth = rightMatrix.readRowMajor()[0].length;
+        if (leftWidth != rightWidth) {
+            throw new IllegalArgumentException("Matrix dimension mismatch: Columns count " + 
+                                            leftWidth + " != " + rightWidth);
         }
         
         List<Runnable> tasks = new ArrayList<>();
