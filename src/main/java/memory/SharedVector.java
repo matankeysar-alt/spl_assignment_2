@@ -50,7 +50,7 @@ public class SharedVector {
     }
 
     public void add(SharedVector other) {
-        lock.writeLock().lock();
+        lock.writeLock().lock(); // write lock before modifying the vector
         try {
 
             if (this.length() != other.length()) {
@@ -63,12 +63,12 @@ public class SharedVector {
         }
         // to ensure the lock is released even if an exception occurs 
         finally {
-            lock.writeLock().unlock();
+            lock.writeLock().unlock(); // release the lock 
         }
     }
 
     public void negate() {
-        lock.writeLock().lock();
+        lock.writeLock().lock(); // write lock before modifying the vector
         try {
             for (int i = 0; i < vector.length; i++) {
                 vector[i] = -vector[i];
@@ -76,11 +76,11 @@ public class SharedVector {
         } 
         // to ensure the lock is released even if an exception occurs 
         finally {
-            lock.writeLock().unlock();
+            lock.writeLock().unlock(); // release the lock
         }
     }
 
-    // Helper method to calculate dot product (assumes read locks are held)
+    // Helper method to calculate dot product (assumes read and write locks are held)
     private double calculateDotProduct(SharedVector other) {
 
         if (this.length() != other.length()) {
@@ -97,8 +97,8 @@ public class SharedVector {
     }
 
     public double dot(SharedVector other) {
-        this.lock.readLock().lock();
-        other.lock.readLock().lock();
+        this.lock.readLock().lock(); // acquire read lock on this vector
+        other.lock.readLock().lock(); // acquire read lock on other vector
         try {
             return calculateDotProduct(other); 
         } 
@@ -110,7 +110,7 @@ public class SharedVector {
     }
 
     public void vecMatMul(SharedMatrix matrix) {
-    lock.writeLock().lock();
+    lock.writeLock().lock(); // acquire write lock on this vector
     try {
 
         if (this.orientation != VectorOrientation.ROW_MAJOR) {
@@ -126,7 +126,7 @@ public class SharedVector {
             throw new IllegalArgumentException("Operation failed: Matrix cannot be empty for vecMatMul");
         }
 
-        int matrixHeight = matrix.get(0).length(); 
+        int matrixHeight = matrix.get(0).length(); // dimensions check
         if (this.length() != matrixHeight) {
             throw new IllegalArgumentException("Vector length (" + this.length() + 
                                                ") must match matrix height (" + matrixHeight + ")");
@@ -141,7 +141,7 @@ public class SharedVector {
             try {
                 result[j] = calculateDotProduct(column);
             } finally {
-                column.readUnlock();
+                column.readUnlock(); // release read lock on column vector
             }
         }
 
@@ -149,7 +149,7 @@ public class SharedVector {
 
         } 
         finally {
-            lock.writeLock().unlock();
+            lock.writeLock().unlock(); // release write lock on this vector
         }
     }
 }
